@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+</head>
+<body class="bg-light">
+    <div class="toast-container position-fixed top-0 end-0 p-3" id="toastContainer"></div>
+    <div class="container py-5">
+        <h1 class="text-center text-primary mb-4">CSV File Management</h1>
+
+        <!-- File Upload Section -->
+        <div class="card mb-4 shadow-sm">
+            <div class="card-body">
+                <h2 class="h5 text-secondary">Upload CSV</h2>
+                <form id="uploadForm" class="d-flex gap-2">
+                    <input type="file" id="fileInput" name="file" accept=".csv" class="form-control">
+                    <button type="submit" class="btn btn-primary">Upload</button>
+                </form>
+                <p id="uploadResult" class="text-success mt-2"></p>
+            </div>
+        </div>
+
+        <!-- Filter Data Section -->
+        <div class="card mb-4 shadow-sm">
+            <div class="card-body">
+                <h2 class="h5 text-secondary">Filter CSV Data</h2>
+                <form id="filterForm" class="row g-3">
+                    <div class="col-md-4">
+                        <input type="text" id="filterFilename" placeholder="Filename" class="form-control">
+                    </div>
+                    <div class="col-md-3">
+                        <input type="number" id="minValue" placeholder="Min Value" class="form-control">
+                    </div>
+                    <div class="col-md-3">
+                        <input type="number" id="maxValue" placeholder="Max Value" class="form-control">
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary w-100">Filter</button>
+                    </div>
+                </form>
+                <p id="filterResult" class="text-success mt-2"></p>
+            </div>
+        </div>
+
+        <!-- Add Data to CSV Section -->
+        <div class="card mb-4 shadow-sm">
+          <div class="card-body">
+              <h2 class="h5 text-secondary">Add Data to CSV</h2>
+              <form id="addForm" class="row g-3">
+                 <!-- Filename -->
+                 <div class="col-md-6">
+                     <input type="text" id="addFilename" placeholder="Filename (e.g., data.csv)" class="form-control" required>
+                    </div>
+
+                 <!-- Timestamp -->
+                 <div class="col-md-4">
+                     <input type="date" id="timestampInput" class="form-control" required>
+                    </div>
+
+                 <!-- Value -->
+                 <div class="col-md-2">
+                     <input type="number" id="valueInput" placeholder="Value (e.g., 98)" class="form-control" required>
+                   </div>
+
+                 <!-- Add Row Button -->
+                 <div class="col-12">
+                     <button type="button" id="addRowButton" class="btn btn-secondary">Add Row</button>
+                    </div>
+                </form>
+
+                <!-- List of Rows -->
+                <ul id="rowList" class="list-group my-3"></ul>
+
+                <!-- Submit All Rows -->
+                <button type="submit" id="submitAllRowsButton" class="btn btn-primary">Submit All</button>
+                <p id="addResult" class="text-success mt-2"></p>
+            </div>
+       </div>
+
+
+        <!-- Delete CSV Section -->
+        <div class="card mb-4 shadow-sm">
+            <div class="card-body">
+                <h2 class="h5 text-secondary">Delete CSV</h2>
+                <form id="deleteForm" class="d-flex gap-2">
+                    <input type="text" id="deleteFilename" placeholder="Filename" class="form-control">
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </form>
+                <p id="deleteResult" class="text-danger mt-2"></p>
+            </div>
+        </div>
+
+        <!-- Visualize Data Section -->
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h2 class="h5 text-secondary">Visualize CSV Data</h2>
+                <form id="visualizeForm" class="d-flex gap-2 mb-3">
+                    <input type="text" id="visualizeFilename" placeholder="Filename" class="form-control">
+                    <button type="submit" class="btn btn-primary">Visualize</button>
+                </form>
+                <canvas id="chart" class="w-100"></canvas>
+                <p id="visualizeResult" class="text-success mt-2"></p>
+            </div>
+        </div>
+    </div>
+    <script>
+        const baseUrl = 'http://192.168.1.36:5000';
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast align-items-center text-bg-${type} border-0 show`;
+            toast.role = 'alert';
+            toast.innerHTML = `
+              <div class="d-flex">
+                  <div class="toast-body">
+                      ${message}
+                   </div>
+                 <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+            `;
+         document.getElementById('toastContainer').appendChild(toast);
+
+         // Auto-remove toast after 3 seconds
+          setTimeout(() => toast.remove(), 3000);
+        }
+
+
+        // Upload CSV
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fileInput = document.getElementById('fileInput');
+            if (!fileInput.files[0]) {
+             console.error('No file selected');
+             document.getElementById('uploadResult').textContent = 'Please select a file.';
+             return;
+            }
+            console.log('Selected file:', fileInput.files[0]); // Debugging
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                const response = await fetch(`${baseUrl}/upload`, {
+                    method: 'POST',
+                    body: formData,
+                });
+                const result = await response.json();
+                console.log('Upload response:', result);
+                if (result.message) {
+                   showToast(result.message, 'success'); // Success toast
+                } else {
+                    showToast(result.error, 'danger'); // Error toast
+                }
+
+            } catch (error) {
+                console.error('Error uploading file:', error);
+                document.getElementById('uploadResult').textContent = 'Error uploading file.';
+            }
+        });
+
+        // Filter CSV
+        document.getElementById('filterForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const filename = document.getElementById('filterFilename').value;
+            const minValue = document.getElementById('minValue').value;
+            const maxValue = document.getElementById('maxValue').value;
+            if (!filename) {
+             console.error('Filename is required');
+             document.getElementById('filterResult').textContent = 'Filename is required.';
+             return;
+            }
+
+            console.log('Filter inputs:', { filename, minValue, maxValue }); // Debugging
+
+            try {
+                const response = await fetch(`${baseUrl}/filter`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename, min_value: parseFloat(minValue), max_value: parseFloat(maxValue) })
+                });
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `filtered_${filename}`;
+                    a.click();
+                    showToast('Filtered file downloaded successfully!', 'success');
+                } else {
+                    const result = await response.json();
+                    console.error('Filter error:', result.error);
+                    document.getElementById('filterResult').textContent = result.error;
+                }
+            } catch (error) {
+                console.error('Error filtering file:', error);
+                document.getElementById('filterResult').textContent = 'Error filtering file.';
+            }
+        });
+
+        // Add Data
+        const rows = []; // Array to store multiple rows temporarily
+
+        // Add Row Button Handler
+        document.getElementById('addRowButton').addEventListener('click', () => {
+           const timestampInput = document.getElementById('timestampInput').value;
+           const valueInput = document.getElementById('valueInput').value;
+
+           // Validate inputs
+           if (!timestampInput || !valueInput) {
+              showToast('Both Timestamp and Value are required to add a row.', 'danger');
+             return;
+            }
+
+           // Add the row to the array in JSON format
+           rows.push({ timestamp: timestampInput, value: parseFloat(valueInput) });
+
+           // Update the UI with the new row
+           const rowList = document.getElementById('rowList');
+           const li = document.createElement('li');
+           li.className = 'list-group-item d-flex justify-content-between align-items-center';
+           li.innerHTML = `
+               <span>${timestampInput} - ${valueInput}</span>
+              <button class="btn btn-sm btn-danger remove-row-button">Remove</button>
+            `;
+            rowList.appendChild(li);
+
+           // Add functionality to remove the row
+           li.querySelector('.remove-row-button').addEventListener('click', () => {
+              const index = Array.from(rowList.children).indexOf(li);
+              rows.splice(index, 1); // Remove from the array
+              li.remove(); // Remove from the UI
+           });
+
+           // Clear inputs
+           document.getElementById('timestampInput').value = '';
+           document.getElementById('valueInput').value = '';
+           showToast('Row added successfully!', 'success');
+        });
+
+        // Submit All Rows Button Handler
+       document.getElementById('submitAllRowsButton').addEventListener('click', async () => {
+           const filename = document.getElementById('addFilename').value;
+
+           if (!filename || rows.length === 0) {
+               showToast('Filename and at least one row are required to submit.', 'danger');
+               return;
+            }
+
+           try {
+               const response = await fetch(`${baseUrl}/add`, {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify({ filename, new_rows: rows }), // Send all rows in JSON format
+             });
+             const result = await response.json();
+
+             if (result.message) {
+                 showToast(result.message, 'success');
+                } else {
+                   showToast(result.error, 'danger');
+                }
+
+               // Clear the list and array
+               rows.length = 0;
+               document.getElementById('rowList').innerHTML = '';
+            } catch (error) {
+                console.error('Error submitting rows:', error);
+                showToast('Error submitting rows.', 'danger');
+            }
+       });
+
+        // Delete CSV
+        document.getElementById('deleteForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const filename = document.getElementById('deleteFilename').value;
+            if (!filename) {
+               console.error('Filename is required to delete');
+               document.getElementById('deleteResult').textContent = 'Filename is required.';
+               return;
+            }
+
+            console.log('Deleting file:', filename); // Debugging
+
+            try {
+                const response = await fetch(`${baseUrl}/delete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename })
+                });
+                const result = await response.json();
+                if (result.message) {
+                  showToast(result.message, 'success'); // Success toast
+                } else {
+                 showToast(result.error, 'danger'); // Error toast
+                }
+
+            } catch (error) {
+                console.error('Error adding data:', error);
+                document.getElementById('deleteResult').textContent = 'Error deleting file.';
+            }
+        });
+
+        // Visualize CSV
+        document.getElementById('visualizeForm').addEventListener('submit', async (e) => {
+           e.preventDefault();
+           const filename = document.getElementById('visualizeFilename').value;
+
+           if (!filename) {
+              console.error('Filename is required for visualization');
+              showToast('Filename is required for visualization', 'danger');
+              return;
+            }
+
+           console.log('Visualizing file:', filename);
+
+           try {
+                const response = await fetch(`${baseUrl}/visualize?filename=${filename}`);
+                const result = await response.json();
+                console.log('Visualization response:', result); // Debugging
+
+                if (response.ok) {
+                  // Get the canvas context
+                  const ctx = document.getElementById('chart').getContext('2d');
+
+                  // Clear the canvas if a chart already exists
+                  if (window.myChart) {
+                     window.myChart.destroy();
+                    }
+
+                 // Create a new chart instance
+                   window.myChart = new Chart(ctx, {
+                      type: 'line',
+                      data: {
+                          labels: result.timestamps,
+                          datasets: [{
+                              label: 'Values',
+                              data: result.values,
+                              borderColor: 'rgba(75, 192, 192, 1)',
+                              borderWidth: 2,
+                              fill: false,
+                            }],
+                        },
+                       options: {
+                          responsive: true,
+                          scales: {
+                              x: {
+                                 title: { display: true, text: 'Timestamp' },
+                                },
+                              y: {
+                                 title: { display: true, text: 'Value' },
+                                },
+                            },
+                        },
+                    });
+                    showToast('Data visualized successfully!', 'success');
+                }else {
+            showToast(result.error || 'Failed to visualize data', 'danger');
+             }
+           } catch (error) {
+              console.error('Error visualizing data:', error);
+              showToast('Error visualizing data.', 'danger');
+            }
+        });
+
+        
+    </script>
+</body>
+</html>
