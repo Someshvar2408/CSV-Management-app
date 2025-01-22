@@ -57,17 +57,21 @@ A user-friendly web application for managing, analyzing, and visualizing CSV fil
    git clone https://github.com/your-username/csv-management-app.git
    cd csv-management-app
    
-2. Setup the backend
+2. **Setup the backend**
+   ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    
-4. Install Dependencies
-pip install -r requirements.txt
+3. **Install Dependencies**
+   ```bash
+   pip install -r requirements.txt
 
-4.Run the Flask Server
-python app.py
+4.**Run the Flask Server**
+  ```bash
+  python app.py
 
-5.Access the application
+5.**Access the application**
+  ```bash
   http://192.168.1.36:5000/ 
 
 DIRECTORY STRUCTURE
