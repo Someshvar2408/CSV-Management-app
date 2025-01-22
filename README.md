@@ -43,7 +43,21 @@ A user-friendly web application for managing, analyzing, and visualizing CSV fil
 - Pandas (for CSV file processing)  
 
 ---
+### **DIRECTORY STRUCTURE**
+csv-management-app/
+├── app.py                  # Flask backend
+├── templates/
+│   └── index.html          # Frontend HTML
+├── static/
+│   ├── styles.css          # Custom CSS
+│   └── scripts.js          # Frontend JavaScript
+├── uploads/                # Directory for uploaded CSV files
+├── requirements.txt        # Python dependencies
+└── README.md               # Project documentation
 
+### **Access the application**
+http://192.168.1.36:5000/ 
+---
 ## **Setup and Installation**  
 
 ### **Prerequisites**  
@@ -69,20 +83,9 @@ A user-friendly web application for managing, analyzing, and visualizing CSV fil
 4.**Run the Flask Server**
   ```bash
   python app.py
-5.**Access the application**
-  http://192.168.1.36:5000/ 
 
-DIRECTORY STRUCTURE
-csv-management-app/
-├── app.py                  # Flask backend
-├── templates/
-│   └── index.html          # Frontend HTML
-├── static/
-│   ├── styles.css          # Custom CSS
-│   └── scripts.js          # Frontend JavaScript
-├── uploads/                # Directory for uploaded CSV files
-├── requirements.txt        # Python dependencies
-└── README.md               # Project documentation
+
+
 
 
 
