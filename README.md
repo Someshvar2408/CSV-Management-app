@@ -69,7 +69,6 @@ A user-friendly web application for managing, analyzing, and visualizing CSV fil
 4.**Run the Flask Server**
   ```bash
   python app.py
-
 5.**Access the application**
   http://192.168.1.36:5000/ 
 
