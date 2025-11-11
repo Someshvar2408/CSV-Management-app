@@ -46,39 +46,84 @@ jobs:
           sleep 2
           echo "Started gunicorn (logs -> gunicorn.log)"
 
-      - name: Download ngrok
+      - name: Download ngrok (v3+)
         run: |
-          curl -sSL -o ngrok.zip https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip
-          unzip ngrok.zip
+          set -euo pipefail
+          echo "Fetching latest ngrok (v3+) linux-amd64 release URL..."
+          NGROK_URL=$(curl -sSf https://api.github.com/repos/ngrok/ngrok/releases/latest \
+            | jq -r '.assets[] | select(.name|test("linux.*amd64|amd64.*linux|linux.*x86_64|x86_64.*linux")) | .browser_download_url' \
+            | head -n1)
+          if [ -z "${NGROK_URL:-}" ]; then
+            echo "Failed to determine ngrok download URL"; exit 1
+          fi
+          echo "Downloading $NGROK_URL"
+          curl -sSL "$NGROK_URL" -o ngrok.asset
+          # Try extracting tarball first, fallback to unzip/search
+          if tar -tzf ngrok.asset >/dev/null 2>&1; then
+            tar -xzf ngrok.asset
+          else
+            mkdir -p ngrok_extracted
+            if unzip -q ngrok.asset -d ngrok_extracted >/dev/null 2>&1; then
+              :
+            else
+              # fallback: try tar extraction into ngrok_extracted (handles some tar variants)
+              tar -xzf ngrok.asset -C ngrok_extracted >/dev/null 2>&1 || true
+            fi
+            # locate binary inside extracted tree
+            if [ -f ngrok_extracted/ngrok ]; then
+              mv ngrok_extracted/ngrok .
+            else
+              FOUND=$(find ngrok_extracted -type f -name ngrok -print -quit || true)
+              if [ -n "$FOUND" ]; then
+                mv "$FOUND" .
+              else
+                echo "Could not extract ngrok binary"; ls -la ngrok_extracted || true; exit 1
+              fi
+            fi
+          fi
           chmod +x ngrok
+          ./ngrok version
 
-      - name: Start ngrok and print public URL
+      - name: Start ngrok and print public URL (v3+)
         env:
           NGROK_AUTHTOKEN: ${{ secrets.NGROK_AUTHTOKEN }}
+          APP_PORT: ${{ env.APP_PORT }}
         run: |
-          if [ -z "$NGROK_AUTHTOKEN" ]; then
+          set -euo pipefail
+          if [ -z "${NGROK_AUTHTOKEN:-}" ]; then
             echo "NGROK_AUTHTOKEN not set. Please add it to repository secrets."
             exit 1
           fi
-          ./ngrok authtoken $NGROK_AUTHTOKEN
-          nohup ./ngrok http ${{ env.APP_PORT }} --log=stdout > ngrok.log 2>&1 &
-          # wait for ngrok to setup its API
-          for i in {1..15}; do
-            TUNNELS_JSON=$(curl --silent http://127.0.0.1:4040/api/tunnels || true)
-            if [ -n "$TUNNELS_JSON" ] && echo "$TUNNELS_JSON" | jq -e '.tunnels | length > 0' > /dev/null 2>&1; then
+
+          # Configure ngrok (v3+)
+          ./ngrok config add-authtoken "$NGROK_AUTHTOKEN"
+
+          LOGFILE=ngrok.log
+          # start ngrok in background
+          ./ngrok http "$APP_PORT" --log=stdout >"$LOGFILE" 2>&1 &
+          NGROK_PID=$!
+
+          # wait for ngrok local API to become available
+          for i in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:4040/api/tunnels >/dev/null 2>&1; then
               break
             fi
             sleep 1
           done
+
           echo "ngrok tunnels API output:"
-          cat ngrok.log || true
+          cat "$LOGFILE" || true
+
           PUBLIC_URL=$(curl --silent http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url' || true)
           if [ -z "$PUBLIC_URL" ] || [ "$PUBLIC_URL" = "null" ]; then
             echo "Failed to get public URL from ngrok API. Dumping /api/tunnels response:"
             curl --silent http://127.0.0.1:4040/api/tunnels || true
+            kill "$NGROK_PID" >/dev/null 2>&1 || true
             exit 1
           fi
+
           echo "Application should be reachable at: $PUBLIC_URL"
           # Keep the job running for a while so the endpoint is available; adjust timeout as needed
           echo "Keeping job alive for 1 hour (3600s). To stop sooner cancel the workflow run."
-          sleep 3600
+          sleep 3600 &
+          wait
